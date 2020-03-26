@@ -1,0 +1,24 @@
+
+
+spring:
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-server
+      profile: dev
+      label: master #不写默认是读master
+#日志
+logging:
+  level:
+    com:
+      example:
+        pointshare:
+          #开启输出feign
+          feign:
+            PointService: DEBUG
+
+#开启断路由
+feign:
+  hystrix:
+    enabled: true

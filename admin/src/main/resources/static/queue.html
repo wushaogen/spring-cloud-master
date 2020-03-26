@@ -1,0 +1,208 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello queue</title>
+    <script src="sockjs.min.js"></script>
+    <script src="stomp.min.js"></script>
+    <script src="jquery-3.2.1.min.js"></script>
+    <script type="text/javascript">
+        var stompClient = null;
+        var token = null;
+        var tryTimes=0;//重连次数
+        function setConnected(connected){
+            document.getElementById("connect").disabled = connected;
+            document.getElementById("disconnect").disabled = !connected;
+            $("#response").html();
+        }
+        function login() {
+            var username = document.getElementById('user').value;
+            $.ajax({
+                type: "POST",
+                url: "http://localhost:8888/restful/login",
+                dataType:"json",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    "username": username
+                }),
+                async:false,
+                success: function (e) {
+                    token = e.data;
+                },
+                error: function (e) {
+
+                }
+            });
+        }
+        function jianlian() {
+            $.ajax({
+                type: "POST",
+                url: "http://localhost:8888/restful/jianlian",
+                contentType: "application/json",
+                dataType:"json",
+                data: JSON.stringify({
+                    "username": "we4dcb4a612ff346688ba37e87728f1e27",
+                    "username1": "wubced55b88e6e44118bfc20547fc3f4bc",
+                }),
+                async:false,
+                success: function (e) {
+                },
+                error: function (e) {
+
+                }
+            });
+        }
+        //心跳检测与重连
+        var heartCheck = {
+            timeout: 5000, //5s发一次心跳
+            timeoutObj: null,
+            serverTimeoutObj: null,
+            reset: function(){
+                clearTimeout(this.timeoutObj);//清除定时任务
+                clearTimeout(this.serverTimeoutObj);
+                return this;
+            },
+            start: function(){
+                var self = this;
+                this.timeoutObj = setTimeout(function(){
+                    //这里发送一个心跳到后端指定路由，后端该路径收到将再发一条消息到前端指定路由，从而完成一次交互（消息content可以为空 只要能到达路由就可以）
+                    stompClient.send("/api/auth/business/app/checkWebSocket",{},JSON.stringify({
+                        "body": {
+                            "channel":"454",
+                            "data": "DFDFDF",
+                            "path": "string"
+                        },
+                        "head": {
+                            "clientType": 1,
+                            "timestamp": 1493607801057,
+                            "token": "eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjQ3Mjc4MzgzNzYsIndvcmtObyI6IlA0ODcyIiwicm9sZSI6IjEiLCJvcmdDb2RlIjoiUFQwMiIsInZlbnVlRGVzYyI6IkZQMTcyIiwidmVudWVJZCI6IjEwNTMyIiwibW9iaWxlIjoiOTIwNDg4ODgiLCJzaG9wSWQiOiI5OTg3NjI1MzYzNjUwNjQxOTMiLCJ1c2VyVHlwZSI6IjcwIiwidXNlcklkIjoiMTEzOTM2MTk5MTk5NjQ2NTE1MiIsImRldmljZUlkIjoiMTAwIiwib3JnSWQiOiI5NzcwOTA1MzM3NjY4MjgwMzMifQ.OOuSzTCFqMzspEnx03hUYgSVOioE54q9UUKQAOaWW3a74hZjbZtdEhOkzIsfuJ0_Imqo7RXSN3rnnsMFRjPS-OoIVOPoEoc7JKqKvVcclA5xwXP8C_R9z-IgjqkTd9a00SwrgGuCmFZxatFX5gR50fJD52zyV0SncSTRU2YdAeY",
+                            "transactionId": "5b422d0b-26a0-4695-a326-8a33d173756a"
+                        },
+                        "sign": "4EABF9EDBECFE4E9084181D6B5D59A92"
+                    }));
+
+                    //如果超过一定时间还没重置才会执行到这，说明后端主动断开了
+                    self.serverTimeoutObj = setTimeout(function(){
+                        disconnect();
+                        reconnect();
+                    }, self.timeout)
+                }, this.timeout)
+            }
+        }
+        function connect() {
+            var socket = new SockJS("http://vbh-dev.vpclub.cn/vbh-service-business/api/auth/business/queueServer");
+            stompClient = Stomp.over(socket);
+            //heartCheck.reset().start(); //开始心跳检测
+            stompClient.connect({
+                "token":"eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjQ3Mjc4MzgzNzYsIndvcmtObyI6IlA0ODcyIiwicm9sZSI6IjEiLCJvcmdDb2RlIjoiUFQwMiIsInZlbnVlRGVzYyI6IkZQMTcyIiwidmVudWVJZCI6IjEwNTMyIiwibW9iaWxlIjoiOTIwNDg4ODgiLCJzaG9wSWQiOiI5OTg3NjI1MzYzNjUwNjQxOTMiLCJ1c2VyVHlwZSI6IjcwIiwidXNlcklkIjoiMTEzOTM2MTk5MTk5NjQ2NTE1MiIsImRldmljZUlkIjoiMTAwIiwib3JnSWQiOiI5NzcwOTA1MzM3NjY4MjgwMzMifQ.OOuSzTCFqMzspEnx03hUYgSVOioE54q9UUKQAOaWW3a74hZjbZtdEhOkzIsfuJ0_Imqo7RXSN3rnnsMFRjPS-OoIVOPoEoc7JKqKvVcclA5xwXP8C_R9z-IgjqkTd9a00SwrgGuCmFZxatFX5gR50fJD52zyV0SncSTRU2YdAeY",
+                "channel":"454",
+                "clientType":1
+            }, function(frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                //订阅(该路由专门用于心跳检测）
+                stompClient.subscribe('/api/auth/business/user/1-454/checkNet', function (result) {
+                    heartCheck.reset().start(); //开始心跳检测
+                });
+                stompClient.subscribe('/api/auth/business/user/1-454/message', function(response){
+                    var response1 = document.getElementById('response');
+                    var p = document.createElement('p');
+                    console.log(response)
+                    p.style.wordWrap = 'break-word';
+                    p.appendChild(document.createTextNode(response.body));
+                    response1.appendChild(p);
+                });
+            },function(error){
+                console.log(error);
+                // 断开重连机制，捕获异常发生时重连
+                if (error.indexOf('Lost connection') > -1 || JSON.stringify(error).indexOf('ERROR') > -1) {
+                    reconnect();
+                }
+
+            });
+        }
+        function disconnect() {
+            if (stompClient != null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+        }
+        function reconnect() {
+            if(tryTimes>10){
+                console.log("重连次数以达上限 连接失败")
+                return;
+            }
+            tryTimes++;
+            setTimeout(function () { //没连接上会一直重连，设置延迟避免请求过多
+                connect();
+            }, 3000);
+        }
+        function sendName() {
+            var name = document.getElementById('name').value;
+            var user = document.getElementById('user').value;
+            console.info(1111111111);
+            stompClient.send("/app/queue", {}, JSON.stringify({ 'msg': name,'user':user}));
+        }
+        function sendName1() {
+            var name = document.getElementById('name').value;
+            console.info(1111111111);
+            stompClient.send("/app/test", {}, JSON.stringify({ 'msg': name,'user':token}));
+        }
+        function sendName2() {
+            var name = document.getElementById('name').value;
+            $.ajax({
+                type: "POST",
+                url: "https://vbh-dev.vpclub.cn/vbh-service-business/api/auth/business/web-message/push",
+                contentType: "application/json",
+                dataType:"json",
+                data: JSON.stringify({
+                    "body": {
+                        "channel": "454",
+                        "data": "DFDFDF",
+                        "path": "string"
+                    },
+                    "head": {
+                        "clientType": 1,
+                        "timestamp": 1493607801057,
+                        "token": "eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjQ3Mjc4MzgzNzYsIndvcmtObyI6IlA0ODcyIiwicm9sZSI6IjEiLCJvcmdDb2RlIjoiUFQwMiIsInZlbnVlRGVzYyI6IkZQMTcyIiwidmVudWVJZCI6IjEwNTMyIiwibW9iaWxlIjoiOTIwNDg4ODgiLCJzaG9wSWQiOiI5OTg3NjI1MzYzNjUwNjQxOTMiLCJ1c2VyVHlwZSI6IjcwIiwidXNlcklkIjoiMTEzOTM2MTk5MTk5NjQ2NTE1MiIsImRldmljZUlkIjoiMTAwIiwib3JnSWQiOiI5NzcwOTA1MzM3NjY4MjgwMzMifQ.OOuSzTCFqMzspEnx03hUYgSVOioE54q9UUKQAOaWW3a74hZjbZtdEhOkzIsfuJ0_Imqo7RXSN3rnnsMFRjPS-OoIVOPoEoc7JKqKvVcclA5xwXP8C_R9z-IgjqkTd9a00SwrgGuCmFZxatFX5gR50fJD52zyV0SncSTRU2YdAeY",
+                        "transactionId": "5b422d0b-26a0-4695-a326-8a33d173756a"
+                    },
+                    "sign": "4EABF9EDBECFE4E9084181D6B5D59A92"
+                }),
+                async:false,
+                success: function (e) {
+                },
+                error: function (e) {
+
+                }
+            });
+
+        }
+
+
+
+
+    </script>
+</head>
+<body onload="disconnect()">
+<noscript><h2 style="color: #ff0000">Seems your browser doesn't support Javascript! Websocket relies on Javascript being enabled. Please enable
+    Javascript and reload this page!</h2></noscript>
+<div>
+    <div>
+        <labal>用户</labal><input type="text" id="user" />
+        <button id="connect" onclick="connect();">Connect</button>
+        <button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+    </div>
+    <div id="conversationDiv">
+        <labal>名字</labal><input type="text" id="name" />
+        <button id="sendName" onclick="sendName();">Send</button>
+        <button id="sendName1" onclick="sendName1();">Send1</button>
+        <button id="sendName2" onclick="sendName2();">Send2</button>
+        <button id="login" onclick="login();">login</button>
+        <button id="jianlian" onclick="jianlian();">jianlian</button>
+        <p id="response"></p>
+    </div>
+</div>
+
+</body>
+</html>

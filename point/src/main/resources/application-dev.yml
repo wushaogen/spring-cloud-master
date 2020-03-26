@@ -1,0 +1,29 @@
+
+spring:
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-server
+      profile: dev
+      label: master #(我已经在config-server里边设置过读取dev，但是实际测试这里如果不设置的话config-server读取的还是master，不知道是不是个bug)
+  #添加rabbitmq配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: root
+    password: root
+#不加访问刷新服务/bus/refresh会报401
+management:
+  security:
+    enabled: false
+#开启输出sql日志
+logging:
+  level:
+    com:
+      example:
+        point:
+          dao: DEBUG
+
+local:
+  profile: localDev
